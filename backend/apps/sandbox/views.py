@@ -140,13 +140,17 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project = self.get_object()
         files = ProjectFile.objects.filter(project=project)
 
+        import os
+
         # Create ZIP in memory
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             for file in files:
-                # Normalize path to avoid issues
-                file_path = file.path.lstrip("/")
-                zip_file.writestr(file_path, file.content)
+                # Sanitize path to prevent Zip Slip (Directory Traversal)
+                clean_path = os.path.normpath(file.path.lstrip("/"))
+                if clean_path.startswith("..") or os.path.isabs(clean_path):
+                    continue  # Skip malicious paths attempting to escape the directory
+                zip_file.writestr(clean_path, file.content)
 
             # Add a README file
             readme_content = f"""# {project.name}
