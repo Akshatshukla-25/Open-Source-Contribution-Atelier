@@ -378,54 +378,51 @@ def invalidate_cache_on_save(sender, instance, created, **kwargs):
     """
     Invalidate cache when a model is saved.
     """
-if not _cache_signals_enabled:
-    return
+    if not _cache_signals_enabled:
+        return
 
-# Skip during migrations or when system apps are involved
-if (
-    _is_migration_in_progress()
-    or sender._meta.app_label
-    in ["migrations", "contenttypes", "sessions", "admin", "sites", "auth"]
-):
-    return
+    # Skip during migrations or when system apps are involved
+    if (
+        _is_migration_in_progress()
+        or sender._meta.app_label
+        in ["migrations", "contenttypes", "sessions", "admin", "sites", "auth"]
+    ):
+        return
 
-try:
-    manager = CacheManager()
-    manager.invalidate_dependencies(instance)
-except Exception:
-    # Silently ignore errors during migrations/cache invalidation
-    pass
+    try:
+        manager = CacheManager()
+        manager.invalidate_dependencies(instance)
+    except Exception:
+        # Silently ignore errors during migrations/cache invalidation
         pass
-
 
 @receiver(post_delete)
 def invalidate_cache_on_delete(sender, instance, **kwargs):
     """
     Invalidate cache when a model is deleted.
     """
-if not _cache_signals_enabled:
-    return
+    if not _cache_signals_enabled:
+        return
 
-# Skip during migrations or for Django system apps
-if _is_migration_in_progress():
-    return
+    # Skip during migrations or for Django system apps
+    if _is_migration_in_progress():
+        return
 
-if sender._meta.app_label in [
-    "migrations",
-    "contenttypes",
-    "sessions",
-    "admin",
-    "sites",
-    "auth",
-]:
-    return
+    if sender._meta.app_label in [
+        "migrations",
+        "contenttypes",
+        "sessions",
+        "admin",
+        "sites",
+        "auth",
+    ]:
+        return
 
-try:
-    manager = CacheManager()
-    manager.invalidate_dependencies(instance)
-except Exception:
-    # Silently ignore cache invalidation errors
-    pass
+    try:
+        manager = CacheManager()
+        manager.invalidate_dependencies(instance)
+    except Exception:
+        # Silently ignore cache invalidation errors
         pass
 
 

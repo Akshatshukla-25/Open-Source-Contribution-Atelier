@@ -60,7 +60,7 @@ urlpatterns = [
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path(
         "api/docs/",
-        SpectacularSwaggerSplitView.as_view(url_name="schema"),
+        SpectacularSwaggerView.as_view(url_name="schema"),
         name="swagger-ui",
     ),
     path("api/graphql/", csrf_exempt(GraphQLView.as_view(graphiql=True))),
@@ -78,7 +78,7 @@ if settings.DEBUG:
         path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
         path(
             "api/docs/",
-            SpectacularSwaggerSplitView.as_view(url_name="schema"),
+            SpectacularSwaggerView.as_view(url_name="schema"),
             name="swagger-ui",
         ),
         path("graphql/", csrf_exempt(GraphQLView.as_view(graphiql=True))),

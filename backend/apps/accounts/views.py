@@ -99,54 +99,9 @@ class SignupView(generics.CreateAPIView):
     throttle_classes = [SignupThrottle]
 
 
-@extend_schema(
-    summary="Register a new user",
-    description="Create a new user account with username, email, and password",
-    request=UserCreateSchema,
-    responses={
-        201: OpenApiResponse(description="User created successfully"),
-        400: OpenApiResponse(description="Validation error"),
-    },
-    examples=[
-        OpenApiExample(
-            name="Valid Registration",
-            value={
-                "username": "johndoe",
-                "email": "john@example.com",
-                "password": "SecurePass123",
-            },
-        )
-    ],
-)
-def register(request):
-    pass
 
 
-@extend_schema(
-    summary="Login user",
-    description="Authenticate user and return JWT token",
-    request=UserLoginSchema,
-    responses={
-        200: OpenApiResponse(
-            description="Login successful", response=LoginResponseSchema
-        ),
-        401: OpenApiResponse(description="Invalid credentials"),
-    },
-)
-def login(request):
-    pass
 
-
-@extend_schema(
-    summary="Get user profile",
-    description="Returns current user profile information",
-    responses={
-        200: UserProfileSchema,
-        401: OpenApiResponse(description="Unauthorized"),
-    },
-)
-def get_profile(request):
-    pass
 
 
 class MeView(APIView):
