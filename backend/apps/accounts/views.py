@@ -46,6 +46,12 @@ from .serializers import (
     UserListSerializer,
     UserUpdateSerializer,
 )
+from schemas.user import (
+    UserCreateSchema,
+    UserLoginSchema,
+    UserResponseSchema,
+    UserProfileSchema,
+)
 from .tasks import (
     send_magic_link_email_task,
     send_otp_email_task,
@@ -101,8 +107,31 @@ class SignupView(generics.CreateAPIView):
 
 
 
+@extend_schema(
+    summary="Login user",
+    description="Authenticate user and return JWT token",
+    request=UserLoginSchema,
+    responses={
+        200: OpenApiResponse(
+            description="Login successful", response=UserResponseSchema
+        ),
+        401: OpenApiResponse(description="Invalid credentials"),
+    },
+)
+def login(request):
+    pass
 
 
+@extend_schema(
+    summary="Get user profile",
+    description="Returns current user profile information",
+    responses={
+        200: UserResponseSchema,
+        401: OpenApiResponse(description="Unauthorized"),
+    },
+)
+def get_profile(request):
+    pass
 
 class MeView(APIView):
     permission_classes = [IsAuthenticated]  # check jwt authentication
@@ -119,9 +148,9 @@ class MeView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
-        instance.refresh_from_db()
+        instance.refresh_from_db()  # type: ignore
         if hasattr(instance, "profile"):
-            instance.profile.refresh_from_db()
+            instance.profile.refresh_from_db()  # type: ignore
         response_serializer = UserListSerializer(instance, context={"request": request})
         return Response(response_serializer.data)
 

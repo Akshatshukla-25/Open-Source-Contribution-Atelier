@@ -90,10 +90,10 @@ class CacheManager:
 
         if result:
             logger.debug(f"Cache set: {key} (TTL: {ttl}s)")
-        else:
-            logger.warning(f"Cache set failed: {key}")
-
-        return result
+            return True
+        
+        logger.warning(f"Cache set failed: {key}")
+        return False
 
     def delete(self, key: str) -> bool:
         """
@@ -108,7 +108,8 @@ class CacheManager:
         result = cache.delete(key)
         if result:
             logger.debug(f"Cache delete: {key}")
-        return result
+            return True
+        return False
 
     def clear_pattern(self, pattern: str) -> int:
         """
@@ -120,13 +121,17 @@ class CacheManager:
         Returns:
             int: Number of keys deleted
         """
-        # Note: This is a simplified implementation
-        # In production, use Redis SCAN for better performance
-        keys = cache.keys(f"*{pattern}*")
+        # Note: This is a simplified implementation using standard django cache backend features
+        # In production, use Redis SCAN for better performance if using a Redis backend
         count = 0
-        for key in keys:
-            if cache.delete(key):
-                count += 1
+        if hasattr(cache, 'keys'):
+            keys = cache.keys(f"*{pattern}*")  # type: ignore
+            for key in keys:
+                if cache.delete(key):
+                    count += 1
+        else:
+            logger.warning("Cache backend does not support keys() pattern extraction natively.")
+            
         logger.info(f"Cleared {count} keys matching pattern: {pattern}")
         return count
 
@@ -202,8 +207,10 @@ class CacheManager:
                         parent = getattr(target, field.name)
                         if parent:
                             self.invalidate_dependencies(parent)
-                    except:
-                        pass
+                    except Exception:
+                        logger.exception(
+                            "Failed to invalidate parent cache dependency."
+                        )
 
     def warm_cache(self, model_name: str):
         """
@@ -392,9 +399,12 @@ def invalidate_cache_on_save(sender, instance, created, **kwargs):
     try:
         manager = CacheManager()
         manager.invalidate_dependencies(instance)
-    except Exception:
-        # Silently ignore errors during migrations/cache invalidation
-        pass
+    except Exception as e:
+        logger.warning(
+            "Cache invalidation failed after saving %s: %s",
+            instance,
+            e,
+        )
 
 @receiver(post_delete)
 def invalidate_cache_on_delete(sender, instance, **kwargs):
@@ -421,9 +431,12 @@ def invalidate_cache_on_delete(sender, instance, **kwargs):
     try:
         manager = CacheManager()
         manager.invalidate_dependencies(instance)
-    except Exception:
-        # Silently ignore cache invalidation errors
-        pass
+    except Exception as e:
+        logger.warning(
+            "Cache invalidation failed after deleting %s: %s",
+            instance,
+            e,
+        )
 
 
 @receiver(m2m_changed)
@@ -437,16 +450,25 @@ def invalidate_cache_on_m2m_change(
         manager = CacheManager()
         try:
             manager.invalidate_dependencies(instance)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(
+                "Cache invalidation failed for M2M change on %s: %s",
+                instance,
+                e,
+            )
 
         # Also invalidate for related objects
-        for pk in pk_set:
-            try:
-                related = model.objects.get(pk=pk)
+        if pk_set:
+            for pk in pk_set:
                 try:
-                    manager.invalidate_dependencies(related)
-                except Exception:
+                    related = model.objects.get(pk=pk)
+                    try:
+                        manager.invalidate_dependencies(related)
+                    except Exception as e:
+                        logger.warning(
+                            "Cache invalidation failed for related object with pk=%s: %s",
+                            pk,
+                            e,
+                        )
+                except model.DoesNotExist:
                     pass
-            except model.DoesNotExist:
-                pass
