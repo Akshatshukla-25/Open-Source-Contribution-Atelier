@@ -19,7 +19,7 @@ export function CertificateModal({
 
   return (
     <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="w-full max-w-4xl bg-[#FFF9F0] rounded-[2rem] border-8 border-black p-8 sm:p-12 relative flex flex-col justify-between items-center text-center shadow-card bg-dot-grid print:border-none print:shadow-none print:p-0">
+      <div className="w-full max-w-4xl bg-[#FFF9F0] rounded-[2rem] border-8 border-black p-8 sm:p-12 relative flex flex-col justify-between items-center text-center shadow-card bg-dot-grid print:border-none print:shadow-none print:p-0 print:bg-white print:text-black">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 bg-white border-2 border-black p-2 rounded-full hover:bg-surface-low transition-colors print:hidden"

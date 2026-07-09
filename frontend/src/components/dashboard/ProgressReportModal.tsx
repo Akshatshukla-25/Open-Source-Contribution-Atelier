@@ -32,7 +32,7 @@ export function ProgressReportModal({
 
   return (
     <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="certificate-printable w-full max-w-2xl bg-white rounded-[2rem] border-8 border-black p-8 sm:p-10 relative shadow-card print:border-none print:shadow-none print:p-0 dark:bg-[#1f1c18] dark:border-[#2e2924]">
+<div className="certificate-printable w-full max-w-2xl bg-white rounded-[2rem] border-8 border-black p-8 sm:p-10 relative shadow-card print:border-none print:shadow-none print:p-0 print:bg-white print:text-black dark:bg-[#1f1c18] dark:border-[#2e2924]">
         <button
           onClick={onClose}
           className="no-print absolute top-4 right-4 bg-white border-2 border-black p-2 rounded-full hover:bg-surface-low transition-colors print:hidden"
