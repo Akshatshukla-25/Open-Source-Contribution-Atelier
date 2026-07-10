@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { GitTerminal } from '../components/GitTerminal';
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ChevronLeft,
@@ -669,6 +670,10 @@ export function LessonPage() {
                       {lesson.points || 15} XP
                     </span>
                   </div>
+
+                  <h3>💻 Git Sandbox</h3>
+                  <p>Try Git commands in this interactive terminal:</p>
+                  <GitTerminal />
 
                   <h3 className="text-lg font-black mb-4 text-text dark:text-[#f0ebe2]">
                     {lesson.quizzes![currentQuizIndex].question}
