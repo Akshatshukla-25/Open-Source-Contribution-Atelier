@@ -165,6 +165,8 @@ INSTALLED_APPS = [
     "apps.feature_flags",
     "apps.issues",
     "django_q",
+    "apps.feature_flags",
+    "apps.issues",
 ]
 # Redis Cache
 CACHES = {
