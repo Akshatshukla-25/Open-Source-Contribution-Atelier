@@ -137,3 +137,39 @@ class TestChatConsumer:
 
         await comm1.disconnect()
         await comm2.disconnect()
+
+    async def test_public_key_exchange(self, auth_user, token):
+        user2 = await create_user("testuser2")
+        token2 = str(AccessToken.for_user(user2))
+        headers = [(b"origin", b"http://localhost")]
+
+        # Connect User 1
+        comm1 = WebsocketCommunicator(
+            application, f"/ws/chat/room1/?token={token}", headers=headers
+        )
+        await comm1.connect()
+        await comm1.receive_json_from()
+
+        # Connect User 2
+        comm2 = WebsocketCommunicator(
+            application, f"/ws/chat/room1/?token={token2}", headers=headers
+        )
+        await comm2.connect()
+        await comm2.receive_json_from()
+
+        # User 1 sends their public key
+        mock_public_key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv..."
+        await comm1.send_json_to(
+            {"action": "public_key", "public_key": mock_public_key}
+        )
+
+        # User 2 should receive the broadcasted public key
+        response = await comm2.receive_json_from()
+        assert response["type"] == "public_key"
+        assert response["username"] == auth_user.username
+        assert response["user_id"] == auth_user.id
+        assert response["public_key"] == mock_public_key
+
+        await comm1.disconnect()
+        await comm2.disconnect()
+

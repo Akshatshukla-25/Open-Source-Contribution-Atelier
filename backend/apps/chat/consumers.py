@@ -122,6 +122,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 },
             )
 
+        elif action == "public_key":
+            public_key = data.get("public_key")
+            if public_key:
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {
+                        "type": "public_key_broadcast",
+                        "username": self.user.username,
+                        "user_id": self.user.id,
+                        "public_key": public_key,
+                        "sender_channel": self.channel_name,
+                    },
+                )
+
         elif action == "send_message":
             content = data.get("message", "")
             if content:
