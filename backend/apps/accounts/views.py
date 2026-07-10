@@ -1,10 +1,14 @@
 import os
 import secrets
+import io
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlencode
 
 import requests as http_requests
+from PIL import Image
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.db.models import Sum
@@ -13,7 +17,14 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django_filters.rest_framework import DjangoFilterBackend
 from django_q.tasks import async_task
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiExample,
+    OpenApiParameter,
+    OpenApiResponse,
+    extend_schema,
+    extend_schema_view,
+)
 from rest_framework import filters, generics, permissions, status
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
@@ -25,7 +36,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from apps.progress.models import LessonProgress, UserBadge
 from apps.progress.serializers import UserBadgeSerializer
 
-from .models import MagicLinkToken, OTPToken, PasswordResetToken
+from .models import MagicLinkToken, OTPToken, PasswordResetToken, UserProfile
 from .serializers import (
     EmailOrUsernameTokenObtainPairSerializer,
     MagicLinkRequestSerializer,
@@ -37,6 +48,12 @@ from .serializers import (
     SignupSerializer,
     UserListSerializer,
     UserUpdateSerializer,
+)
+from schemas.user import (
+    UserCreateSchema,
+    UserLoginSchema,
+    UserResponseSchema,
+    UserProfileSchema,
 )
 from .tasks import (
     send_magic_link_email_task,
@@ -91,6 +108,33 @@ class SignupView(generics.CreateAPIView):
     throttle_classes = [SignupThrottle]
 
 
+@extend_schema(
+    summary="Login user",
+    description="Authenticate user and return JWT token",
+    request=UserLoginSchema,
+    responses={
+        200: OpenApiResponse(
+            description="Login successful", response=UserResponseSchema
+        ),
+        401: OpenApiResponse(description="Invalid credentials"),
+    },
+)
+def login(request):
+    pass
+
+
+@extend_schema(
+    summary="Get user profile",
+    description="Returns current user profile information",
+    responses={
+        200: UserResponseSchema,
+        401: OpenApiResponse(description="Unauthorized"),
+    },
+)
+def get_profile(request):
+    pass
+
+
 class MeView(APIView):
     permission_classes = [IsAuthenticated]  # check jwt authentication
 
@@ -106,9 +150,9 @@ class MeView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         instance = serializer.save()
-        instance.refresh_from_db()
+        instance.refresh_from_db()  # type: ignore
         if hasattr(instance, "profile"):
-            instance.profile.refresh_from_db()
+            instance.profile.refresh_from_db()  # type: ignore
         response_serializer = UserListSerializer(instance, context={"request": request})
         return Response(response_serializer.data)
 
@@ -380,7 +424,7 @@ from .permissions import IsAdminOrModeratorRole
 
 @extend_schema(responses=UserListSerializer(many=True))
 class UserListView(generics.ListAPIView):
-    queryset = User.objects.all().order_by("id")
+    queryset = User.objects.select_related("profile").order_by("id")
     permission_classes = [permissions.IsAuthenticated, IsAdminOrModeratorRole]
     serializer_class = UserListSerializer
     pagination_class = LimitOffsetPagination
@@ -392,6 +436,47 @@ class UserListView(generics.ListAPIView):
     ]
     search_fields = ["username"]
     ordering_fields = ["id", "username"]
+
+
+class UserSuggestionsView(APIView):
+    """
+    GET /api/accounts/users/suggestions/?q=...
+    Returns up to 10 matching usernames for autocomplete mentions.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="q",
+                type=str,
+                location=OpenApiParameter.QUERY,
+                description="Username prefix/search query",
+            )
+        ],
+        responses={200: OpenApiResponse(description="List of matching users")},
+    )
+    def get(self, request):
+        q = request.query_params.get("q", "").strip()
+        if not q:
+            return Response([])
+
+        # Basic case-insensitive matching
+        users = User.objects.filter(username__icontains=q).order_by("username")[:10]
+
+        data = []
+        for user in users:
+            # We can include a basic avatar url or other profile data if available
+            avatar_url = ""
+            if hasattr(user, "profile") and hasattr(user.profile, "avatar_url"):
+                avatar_url = user.profile.avatar_url
+
+            data.append(
+                {"id": user.id, "username": user.username, "avatar_url": avatar_url}
+            )
+
+        return Response(data, status=status.HTTP_200_OK)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -820,6 +905,73 @@ class ExportDataView(APIView):
         )
 
 
+class AvatarUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = AvatarUploadSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        avatar = serializer.validated_data["avatar"]
+
+        # Optimize image
+        try:
+            img = Image.open(avatar)
+
+            # Convert to RGB if needed
+            if img.mode in ("RGBA", "LA", "P"):
+                img = img.convert("RGB")
+
+            # Resize to max 300x300
+            img.thumbnail((300, 300))
+
+            # Save to buffer
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+
+            # Create new file
+            filename = f"{request.user.id}_avatar.jpg"
+            avatar_file = ContentFile(buffer.getvalue(), name=filename)
+
+        except Exception as e:
+            return Response(
+                {"error": "Invalid image file"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Update or create profile
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+        # Delete old avatar if exists
+        if profile.avatar:
+            try:
+                profile.avatar.delete(save=False)
+            except:
+                pass
+
+        profile.avatar = avatar_file
+        profile.save()
+
+        return Response(
+            {
+                "message": "Avatar uploaded successfully",
+                "avatar_url": profile.avatar.url if profile.avatar else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def delete(self, request):
+        """Remove avatar"""
+        profile = UserProfile.objects.filter(user=request.user).first()
+        if profile and profile.avatar:
+            profile.avatar.delete()
+            profile.avatar = None
+            profile.save()
+            return Response({"message": "Avatar removed"})
+        return Response({"error": "No avatar found"}, status=status.HTTP_404_NOT_FOUND)
+
+
 from apps.chat.models import Message
 from apps.content.models import Comment
 
@@ -884,22 +1036,26 @@ class LearningPathView(APIView):
         BadgeEvaluator.evaluate(user)
 
         # 2. Load curriculum modules
-        curriculum_path = os.path.join(
-            settings.BASE_DIR, "..", "frontend", "public", "content", "curriculum.json"
-        )
+        curriculum_path = Path(getattr(settings, "CURRICULUM_JSON_PATH", "")).resolve()
 
-        if not os.path.exists(curriculum_path):
+        if not curriculum_path.exists():
             return Response(
-                {"error": f"Curriculum file not found at {curriculum_path}"},
+                {
+                    "error": "Curriculum configuration file not found.",
+                    "detail": f"Expected at {curriculum_path}",
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
         with open(curriculum_path, "r", encoding="utf-8") as f:
             try:
                 curriculum_data = json.load(f)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 return Response(
-                    {"error": "Failed to parse curriculum content"},
+                    {
+                        "error": "Failed to parse curriculum content.",
+                        "detail": str(e),
+                    },
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
@@ -1021,3 +1177,48 @@ class LearningPathView(APIView):
             recommended = max(scored_modules, key=lambda m: m["score"])
 
         return Response({"modules": scored_modules, "next_step": recommended})
+
+
+class PublicProfileView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, username):
+        from django.contrib.auth.models import User
+        from django.shortcuts import get_object_or_404
+        from django.db.models import Sum
+        from apps.progress.models import UserBadge, LessonProgress
+        from apps.progress.serializers import UserBadgeSerializer
+        from apps.accounts.serializers import UserListSerializer
+
+        user = get_object_or_404(User, username=username)
+
+        # User details
+        user_serializer = UserListSerializer(user, context={"request": request})
+
+        # Badges
+        earned_badges = (
+            UserBadge.objects.filter(user=user)
+            .select_related("badge")
+            .order_by("-earned_at")
+        )
+        badge_serializer = UserBadgeSerializer(earned_badges, many=True)
+
+        # Progress stats
+        total_score = (
+            LessonProgress.objects.filter(user=user).aggregate(total=Sum("score"))[
+                "total"
+            ]
+            or 0
+        )
+        completed_lessons = LessonProgress.objects.filter(
+            user=user, completed=True
+        ).count()
+
+        return Response(
+            {
+                "user": user_serializer.data,
+                "badges": badge_serializer.data,
+                "total_score": total_score,
+                "completed_lessons": completed_lessons,
+            }
+        )
