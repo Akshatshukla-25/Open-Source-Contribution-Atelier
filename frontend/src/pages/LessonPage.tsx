@@ -347,15 +347,11 @@ export function LessonPage() {
       is_correct: isCorrect,
     });
 
-    if (isCorrect) {
-      setQuizFeedback("correct");
-      if (currentQuizIndex === lesson.quizzes.length - 1) {
-        setFeedback("correct");
-        syncProgress({
-          lesson_slug: lesson.slug,
-          score: lesson.points || 15,
-          completed: true,
-        });
+    {isCorrect ? (
+              <span>✅ Correct! Well done!</span>
+            ) : (
+              <span>❌ Incorrect. The correct answer was: {correctAnswer}</span>
+            )}
       }
     } else {
       setQuizFeedback("incorrect");
