@@ -62,6 +62,7 @@ export interface Lesson {
     options: string[];
     answer: number;
     explanation: string;
+    timeLimitSeconds?: number;
   }>;
   conflictScenario?: ConflictScenario;
   pythonExercise?: PythonExercise;
