@@ -146,6 +146,10 @@ const TemplateMarketplacePage = lazy(
   () => import("../pages/TemplateMarketplacePage"),
 );
 
+const PortfolioPage = lazy(
+  () => import("../pages/PortfolioPage"),
+);
+
 function RouteLoadingFallback() {
   return (
     <div
@@ -162,6 +166,16 @@ function RouteLoadingFallback() {
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <RouteLoadingFallback />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login?expired=true" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -401,6 +415,15 @@ export function AppRouter() {
             element={
               <ProtectedRoute>
                 <ModerationDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/portfolio"
+            element={
+              <ProtectedRoute>
+                <PortfolioPage />
               </ProtectedRoute>
             }
           />

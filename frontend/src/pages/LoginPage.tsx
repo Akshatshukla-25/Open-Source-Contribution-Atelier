@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { GitBranch, LogIn, ArrowRight } from "lucide-react";
+import { useGoogleLogin } from "@react-oauth/google";
 import { AuthPageShell } from "../features/auth/AuthPageShell";
 import { fetchApi } from "../lib/api";
 import { useAuth } from "../features/auth/AuthContext";
@@ -44,9 +45,25 @@ export function LoginPage() {
     window.location.href = githubAuthUrl;
   };
 
-  const handleGoogleSignIn = () => {
-    window.location.href = "/api/auth/google/";
-  };
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        const tokens = await fetchApi("/auth/google/", {
+          method: "POST",
+          requireAuth: false,
+          body: JSON.stringify({ access_token: tokenResponse.access_token }),
+        });
+        login(tokens);
+        sessionStorage.setItem("justLoggedIn", "true");
+        window.location.href = "/dashboard";
+      } catch (err: unknown) {
+        setError(getErrorMessage(err, "Google Auth Failed. Check Backend."));
+      }
+    },
+    onError: () => {
+      setError("Google Login Failed / Cancelled.");
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,13 +85,10 @@ export function LoginPage() {
         position: 'bottom-center',
       });
       
-      // ✅ Redirect to dashboard or previous page
+      sessionStorage.setItem("justLoggedIn", "true");
       const redirect = sessionStorage.getItem('login_redirect') || '/dashboard';
       sessionStorage.removeItem('login_redirect');
       window.location.href = redirect;
-
-      sessionStorage.setItem("justLoggedIn", "true");
-      window.location.href = "/dashboard";
 
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Failed to login"));
@@ -103,7 +117,7 @@ export function LoginPage() {
         {/* Google Login Button */}
         <button
           type="button"
-          onClick={handleGoogleSignIn}
+          onClick={() => googleLogin()}
           className="flex items-center justify-center gap-3 w-full px-4 py-3 border border-slate-200 dark:border-slate-800 rounded-xl font-semibold shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:scale-[1.01] active:scale-[0.99] transition-all text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-[#12121a]"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
