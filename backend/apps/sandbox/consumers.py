@@ -288,11 +288,32 @@ class CollabConsumer(AsyncWebsocketConsumer):
         await self.channel_layer.group_add(self.room_group_name, self.channel_name)
         await self.accept()
 
+        from asgiref.sync import sync_to_async
+        from .models import CollabSession, CollabSessionLog
+
+        user = self.scope.get("user")
+        if user and user.is_authenticated:
+            @sync_to_async
+            def log_join():
+                session, _ = CollabSession.objects.get_or_create(id=self.room_id)
+                CollabSessionLog.objects.create(session=session, user=user, action="joined")
+            await log_join()
+
     async def disconnect(self, close_code):
         """
         Removes the client from the collaboration room's group upon disconnection.
         """
         await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+        from asgiref.sync import sync_to_async
+        from .models import CollabSessionLog
+
+        user = self.scope.get("user")
+        if user and user.is_authenticated:
+            @sync_to_async
+            def log_leave():
+                CollabSessionLog.objects.create(session_id=self.room_id, user=user, action="left")
+            await log_leave()
 
     async def receive(self, text_data=None, bytes_data=None):
         if bytes_data:
