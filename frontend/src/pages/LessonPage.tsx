@@ -503,8 +503,12 @@ export function LessonPage() {
       nonce: quizNonce, // NEW: Appended
     });
 
-    if (isCorrect) {
-      setQuizFeedback("correct");
+    {isCorrect ? (
+              <span>✅ Correct! Well done!</span>
+            ) : (
+              <span>❌ Incorrect. The correct answer was: {correctAnswer}</span>
+            )}
+      }
     } else {
       setQuizFeedback("incorrect");
     }
