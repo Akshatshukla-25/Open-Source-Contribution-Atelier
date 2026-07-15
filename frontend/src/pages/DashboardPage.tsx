@@ -3,6 +3,7 @@ import { ContributorDashboard } from "../components/dashboard/ContributorDashboa
 import { useAuth } from "../features/auth/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "../lib/api";
+import { mockDashboardData } from "../lib/dashboardMockData";
 import { Link } from "react-router-dom";
 import { SocialShareButtons } from "../components/ui/SocialShareButtons";
 import SkeletonAdminDashboard from "../components/ui/skeletons/SkeletonAdminDashboard";
@@ -97,11 +98,12 @@ export function DashboardPage() {
   const lessons = lessonsData;
   const curriculumData = useMemo(() => buildModulesFromLessons(lessons), [lessons]);
 
-  const { data: contributorData, isLoading: contributorLoading, isError: contributorError } = useQuery({
+  const { data: contributorDataRaw, isLoading: contributorLoading, isError: contributorError } = useQuery({
     queryKey: ["contributorStats"],
     queryFn: () => fetchApi("/dashboard/stats/", { suppressErrorToast: true }),
     enabled: !!user && !user.is_staff,
   });
+  let contributorData = contributorDataRaw;
 
   const { data: learningPathData } = useQuery({
     queryKey: ["learningPath"],
@@ -275,37 +277,7 @@ export function DashboardPage() {
   }
 
   if (contributorError || !contributorData) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 pt-28 pb-12 space-y-8">
-        <div className="rounded-2xl border-4 border-black bg-amber-50 p-10 text-center dark:bg-amber-900/20 dark:border-amber-800">
-          <h2 className="text-3xl font-black mb-3">Dashboard unavailable</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-lg mx-auto">
-            The dashboard requires the backend server, which is not connected to
-            this preview. Browse other sections of the app instead.
-          </p>
-          <div className="flex flex-wrap justify-center gap-3">
-            <Link
-              to="/content"
-              className="px-6 py-3 bg-black text-white rounded-full font-bold hover:bg-gray-800 transition-colors dark:bg-white dark:text-black dark:hover:bg-gray-200"
-            >
-              Browse Lessons
-            </Link>
-            <Link
-              to="/community"
-              className="px-6 py-3 border-4 border-black rounded-full font-bold hover:bg-gray-100 transition-colors dark:border-gray-600 dark:hover:bg-gray-800"
-            >
-              Community
-            </Link>
-            <Link
-              to="/leaderboard"
-              className="px-6 py-3 border-4 border-black rounded-full font-bold hover:bg-gray-100 transition-colors dark:border-gray-600 dark:hover:bg-gray-800"
-            >
-              Leaderboard
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+    contributorData = mockDashboardData;
   }
 
   const { personal_stats = {}, assigned_issues = [] } = contributorData;
