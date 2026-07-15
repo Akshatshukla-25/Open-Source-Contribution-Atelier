@@ -392,6 +392,8 @@ REST_FRAMEWORK = {
         "auth_magic_link_verify": os.getenv("RATE_AUTH_MAGIC_LINK_VERIFY", "5/minute"),
         # ── Chat ─────────────────────────────────────────────────────────────
         "chat_message": "30/minute",
+        # ── Events ───────────────────────────────────────────────────────────
+        "events_list": os.getenv("RATE_EVENTS_LIST", "60/minute"),
     },
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
