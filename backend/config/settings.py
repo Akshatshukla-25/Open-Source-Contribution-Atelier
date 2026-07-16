@@ -506,9 +506,15 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
 ]
 
-# Auto-include FRONTEND_URL if set and not already in the list
-if _frontend_url and _frontend_url not in CSRF_TRUSTED_ORIGINS:
-    CSRF_TRUSTED_ORIGINS.append(_frontend_url)
+CONTENT_SECURITY_POLICY = {
+    "img-src": [
+        "'self'",
+        "blob:",                    
+        "http://localhost:8000",   
+        "https://*.amazonaws.com",  
+        "data:",                    
+    ],
+}
 
 # ──────────────────────────────────────────
 # Redis Availability and Configuration (Dynamic Fallbacks)
@@ -591,6 +597,8 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Cache timeout for Search API (in seconds) - Default: 1 hour
 SEARCH_CACHE_TIMEOUT = 60 * 60
