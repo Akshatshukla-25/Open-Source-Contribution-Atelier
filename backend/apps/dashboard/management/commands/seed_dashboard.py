@@ -306,6 +306,13 @@ class Command(BaseCommand):
             pr.save()
             self.stdout.write(f"  PR: {pr.title} ({pr.status})")
 
+        # 6. Seed Bounties
+        from django.core.management import call_command
+        try:
+            call_command("seed_bounties")
+        except Exception as e:
+            self.stdout.write(self.style.WARNING(f"  Could not seed bounties: {e}"))
+
         self.stdout.write(
             self.style.SUCCESS("Atelier dashboard data seeded successfully!")
         )
