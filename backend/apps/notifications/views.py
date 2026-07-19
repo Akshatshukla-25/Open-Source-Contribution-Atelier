@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.pagination import PageNumberPagination
 
 from .models import Notification, NotificationPreference, PushSubscription
 from .serializers import NotificationSerializer, PushSubscriptionSerializer
@@ -26,6 +27,13 @@ def _coerce_bool(value, default: bool) -> bool:
     return default
 
 
+
+class NotificationPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class NotificationPrefsView(APIView):
     """GET/PUT /api/notifications/prefs/ — channel delivery preferences."""
 
@@ -37,6 +45,17 @@ class NotificationPrefsView(APIView):
 
     def put(self, request):
         prefs, _ = NotificationPreference.objects.get_or_create(user=request.user)
+<<<<<<< HEAD
+        prefs.email_enabled = request.data.get('email', prefs.email_enabled)
+        prefs.in_app_enabled = request.data.get('in_app', prefs.in_app_enabled)
+        prefs.websocket_enabled = request.data.get('websocket', prefs.websocket_enabled)
+        prefs.save()
+        return Response({
+            'email': prefs.email_enabled,
+            'in_app': prefs.in_app_enabled,
+            'websocket': prefs.websocket_enabled,
+        })
+=======
         prefs.email_enabled = _coerce_bool(
             request.data.get("email"), prefs.email_enabled
         )
@@ -50,6 +69,7 @@ class NotificationPrefsView(APIView):
             update_fields=["email_enabled", "in_app_enabled", "websocket_enabled"]
         )
         return Response(_prefs_payload(prefs))
+>>>>>>> main
 
     def patch(self, request):
         return self.put(request)
@@ -60,6 +80,7 @@ class NotificationListView(generics.ListAPIView):
 
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = NotificationPagination
 
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user)
@@ -78,7 +99,7 @@ class MarkAllReadView(APIView):
 
 
 class MarkOneReadView(APIView):
-    """POST /api/notifications/<pk>/read/"""
+    """POST /api/notifications/<pk>/read/ or PATCH /api/notifications/<pk>/mark-read/"""
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -90,6 +111,9 @@ class MarkOneReadView(APIView):
         notif.is_read = True
         notif.save(update_fields=["is_read"])
         return Response(NotificationSerializer(notif).data)
+
+    def patch(self, request, pk):
+        return self.post(request, pk)
 
 
 class SubscribePushView(APIView):
