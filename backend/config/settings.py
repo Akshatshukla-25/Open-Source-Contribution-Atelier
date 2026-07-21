@@ -1,6 +1,8 @@
 import logging
 import os
 import sys
+from datetime import timedelta
+from pathlib import Path
 import stripe
 import dj_database_url
 
@@ -197,6 +199,7 @@ INSTALLED_APPS = [
     "waffle",
     "apps.plugins.apps.PluginsConfig",
     "apps.oauth",
+    "apps.security",
 ]
 
 # Cache backends are selected with channel layers below (Redis or LocMem fallback).
