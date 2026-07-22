@@ -21,6 +21,7 @@ import {
   GitMerge,
   FileEdit,
   Key,
+  ShoppingBag,
 } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth/AuthContext";
@@ -71,6 +72,7 @@ const navGroups = [
     items: [
       { to: "/portfolio", label: "Portfolio", icon: FileText },
       { to: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
+      { to: "/shop", label: "XP Shop", icon: ShoppingBag },
     ],
   },
   {

@@ -29,6 +29,7 @@ class GamificationConfig(AppConfig):
             pass
 
         self.seed_default_quests()
+        self.seed_shop_items()
 
     @staticmethod
     def seed_default_quests():
@@ -120,4 +121,72 @@ class GamificationConfig(AppConfig):
             Quest.objects.get_or_create(
                 title=quest_data["title"],
                 defaults=quest_data,
+            )
+
+    @staticmethod
+    def seed_shop_items():
+        from .models import ShopItem
+
+        items = [
+            {
+                "name": "Streak Freeze",
+                "description": "Protect your streak for one day — if you miss a day, your streak won't break.",
+                "item_type": "streak_freeze",
+                "cost": 150,
+                "icon_emoji": "❄️",
+                "is_limited": True,
+            },
+            {
+                "name": "XP Boost (2x for 1 Hour)",
+                "description": "Double all XP earned for the next hour. Stackable!",
+                "item_type": "xp_boost",
+                "cost": 300,
+                "icon_emoji": "⚡",
+                "is_limited": False,
+            },
+            {
+                "name": "Custom Title: 'OSS Apprentice'",
+                "description": "Unlock the exclusive 'OSS Apprentice' title displayed on your profile.",
+                "item_type": "custom_title",
+                "cost": 200,
+                "icon_emoji": "📛",
+                "is_limited": True,
+            },
+            {
+                "name": "Custom Title: 'Code Warrior'",
+                "description": "Unlock the exclusive 'Code Warrior' title displayed on your profile.",
+                "item_type": "custom_title",
+                "cost": 500,
+                "icon_emoji": "⚔️",
+                "is_limited": True,
+            },
+            {
+                "name": "Dark Neon Profile Theme",
+                "description": "A slick neon-themed profile layout with cyan highlights.",
+                "item_type": "profile_theme",
+                "cost": 400,
+                "icon_emoji": "🌃",
+                "is_limited": True,
+            },
+            {
+                "name": "Retro Terminal Profile Theme",
+                "description": "Green-on-black terminal aesthetic for your profile page.",
+                "item_type": "profile_theme",
+                "cost": 350,
+                "icon_emoji": "🖥️",
+                "is_limited": True,
+            },
+            {
+                "name": "Badge: Early Adopter",
+                "description": "A special badge for supporting the platform in its early days.",
+                "item_type": "badge_unlock",
+                "cost": 1000,
+                "icon_emoji": "🏅",
+                "is_limited": True,
+            },
+        ]
+        for item_data in items:
+            ShopItem.objects.get_or_create(
+                name=item_data["name"],
+                defaults=item_data,
             )

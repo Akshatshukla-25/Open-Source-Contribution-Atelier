@@ -107,3 +107,46 @@ class UserQuest(models.Model):
         if self.progress >= self.quest.requirement_count and not self.completed:
             self.completed = True
         self.save(update_fields=["progress", "completed"])
+
+
+class ShopItem(models.Model):
+    ITEM_TYPE_CHOICES = [
+        ("streak_freeze", "Streak Freeze"),
+        ("profile_theme", "Profile Theme"),
+        ("badge_unlock", "Badge Unlock"),
+        ("xp_boost", "XP Boost"),
+        ("custom_title", "Custom Title"),
+    ]
+
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    item_type = models.CharField(max_length=50, choices=ITEM_TYPE_CHOICES)
+    cost = models.PositiveIntegerField(help_text="XP cost")
+    icon_emoji = models.CharField(max_length=10, default="🎁")
+    is_limited = models.BooleanField(default=False, help_text="One purchase per user")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["cost"]
+
+    def __str__(self):
+        return f"{self.name} ({self.cost} XP)"
+
+
+class Purchase(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="purchases"
+    )
+    item = models.ForeignKey(
+        ShopItem, on_delete=models.CASCADE, related_name="purchases"
+    )
+    xp_spent = models.PositiveIntegerField()
+    purchased_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-purchased_at"]
+        unique_together = ("user", "item")
+
+    def __str__(self):
+        return f"{self.user} bought {self.item.name} ({self.xp_spent} XP)"
