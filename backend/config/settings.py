@@ -201,6 +201,7 @@ INSTALLED_APPS = [
     "waffle",
     "apps.plugins.apps.PluginsConfig",
     "apps.oauth",
+    "apps.security",
     # ── Scaffolded Apps ────────────────────────────────────────────────────────
     "apps.burnout_detection",
     "apps.advanced_search",

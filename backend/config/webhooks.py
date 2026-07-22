@@ -1,7 +1,7 @@
 import stripe
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .models import CustomerSubscription
+from apps.billing.models import CustomerSubscription
 
 @csrf_exempt
 def stripe_webhook(request):

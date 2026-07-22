@@ -98,6 +98,12 @@ const BackupDashboardPage = lazy(() =>
   })),
 );
 
+const VulnerabilityDashboard = lazy(() =>
+  import("../pages/admin/VulnerabilityDashboard").then((module) => ({
+    default: module.VulnerabilityDashboard,
+  })),
+);
+
 const SandboxPage = lazy(() =>
   import("../pages/SandboxPage").then((module) => ({
     default: module.SandboxPage,
@@ -627,6 +633,15 @@ export function AppRouter() {
             element={
               <ProtectedRoute>
                 <PerformanceDashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/admin/vulnerabilities"
+            element={
+              <ProtectedRoute>
+                <VulnerabilityDashboard />
               </ProtectedRoute>
             }
           />

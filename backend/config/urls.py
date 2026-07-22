@@ -13,7 +13,7 @@ from apps.dashboard.views import LeaderboardView
 
 from .health_view import health_view
 from .version_view import version_view
-from .views import CheckoutSessionView
+from apps.billing.views import CheckoutSessionView
 from .webhooks import stripe_webhook
 
 urlpatterns = [
@@ -71,8 +71,9 @@ urlpatterns = [
     path("api/accessibility/", include("apps.accessibility.urls")),
     # ── Issue Reporting ────────────────────────────────────────────────────────
     path("api/issues/", include("apps.issues.urls")),
-    # ── Project Health Dashboard ───────────────────────────────────────────────
+    # ── Project Health & Security ─────────────────────────────────────────────
     path("api/project-health/", include("apps.project_health.urls")),
+    path("api/security/", include("apps.security.urls")),
     # ── Plugins ────────────────────────────────────────────────────────────────
     path("api/plugins/", include("apps.plugins.urls")),
     # ── Scaffolded Apps ────────────────────────────────────────────────────────
