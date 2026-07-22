@@ -1,5 +1,4 @@
-from django.conf import settings
-
+from django.contrib.auth.models import User
 from django.db import models
 
 from apps.organizations.models import Organization
@@ -17,6 +16,7 @@ class Challenge(models.Model):
     difficulty = models.CharField(max_length=32)
     points = models.PositiveIntegerField(default=50)
     is_featured = models.BooleanField(default=False)
+    is_public = models.BooleanField(default=True)
 
 
 class ChallengeOfTheDay(models.Model):
@@ -41,9 +41,7 @@ class ChallengeCompletion(models.Model):
 
     objects = models.Manager()
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="challenge_completions",
+        User, on_delete=models.CASCADE, related_name="challenge_completions"
     )
     challenge = models.ForeignKey(
         Challenge, on_delete=models.CASCADE, related_name="completions"
