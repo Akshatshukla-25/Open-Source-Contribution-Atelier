@@ -1,35 +1,32 @@
-from django.core.cache import cache
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from django.contrib.auth.models import User
-
-from apps.dashboard.models import Issue, PullRequest
-from apps.progress.models import LessonProgress
+from apps.events.services.event_bus import EventBus
+from apps.dashboard.models import Issue
 
 
-def clear_dashboard_caches(user_id=None):
-    # Always clear the global admin stats cache
-    cache.delete("dashboard_admin_stats")
-    
-    # If a specific user is affected, clear their specific contributor stats cache
-    if user_id:
-        cache.delete(f"dashboard_contributor_stats_{user_id}")
+@receiver(post_save, sender=Issue)
+def publish_issue_indexed_event(sender, instance, **kwargs):
+    EventBus.emit(
+        "SearchIndexRequested",
+        {
+            "app_label": sender._meta.app_label,
+            "model_name": sender._meta.model_name,
+            "object_id": instance.pk,
+            "title": instance.title,
+            "description": instance.description,
+            "tags": instance.status,
+            "body_text": instance.description,
+        },
+    )
 
 
-@receiver([post_save, post_delete], sender=Issue)
-def handle_issue_change(sender, instance, **kwargs):
-    # Clear cache for the assigned contributor if exists
-    user_id = instance.assigned_to.id if instance.assigned_to else None
-    clear_dashboard_caches(user_id=user_id)
-
-
-@receiver([post_save, post_delete], sender=PullRequest)
-def handle_pr_change(sender, instance, **kwargs):
-    # Clear cache for the contributor who created the PR
-    clear_dashboard_caches(user_id=instance.user.id)
-
-
-@receiver([post_save, post_delete], sender=LessonProgress)
-def handle_progress_change(sender, instance, **kwargs):
-    # Clear cache for the contributor who completed the lesson
-    clear_dashboard_caches(user_id=instance.user.id)
+@receiver(post_delete, sender=Issue)
+def publish_issue_deindexed_event(sender, instance, **kwargs):
+    EventBus.emit(
+        "SearchDeindexRequested",
+        {
+            "app_label": sender._meta.app_label,
+            "model_name": sender._meta.model_name,
+            "object_id": instance.pk,
+        },
+    )

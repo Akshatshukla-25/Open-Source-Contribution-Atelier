@@ -1,35 +1,29 @@
 import type { Config } from "tailwindcss";
 
-
 export default {
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
   darkMode: "class",
-  content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        surface: "#FFF9F0",
-        "surface-lowest": "#FFFFFF",
-        "surface-low": "#FFEBC2",
-        "surface-high": "#FFD580",
-        "surface-highest": "#FFAA00",
-        primary: "#FF3B30",
-        "primary-container": "#FFC0B3",
-        tertiary: "#FF9500",
-        accent: "#FFCC00",
-        outline: "#000000",
-        text: "#1F1A15",
-        muted: "#6B5A49",
-      },
-      fontFamily: {
-        display: ["Outfit", "Inter", "sans-serif"],
-        body: ["Inter", "sans-serif"],
-        mono: ["JetBrains Mono", "monospace"],
-      },
-      boxShadow: {
-        card: "4px 4px 0px 0px rgba(0, 0, 0, 1)",
-        "card-lg": "8px 8px 0px 0px rgba(0, 0, 0, 1)",
-        "card-sm": "2px 2px 0px 0px rgba(0, 0, 0, 1)",
-        "gel": "0px 8px 0px 0px rgba(230, 40, 20, 1), 0px -4px 0px 0px rgba(255,100,80,1) inset",
+        light: {
+          bg: "#ffffff",
+          text: "#111827",
+          card: "#f9fafb",
+          border: "#e5e7eb",
+          primary: "#7c3aed",
+          secondary: "#6b7280",
+          muted: "#9ca3af",
+        },
+        dark: {
+          bg: "#0f172a",
+          text: "#f3f4f6",
+          card: "#1e293b",
+          border: "#334155",
+          primary: "#8b5cf6",
+          secondary: "#9ca3af",
+          muted: "#64748b",
+        },
       },
     },
   },

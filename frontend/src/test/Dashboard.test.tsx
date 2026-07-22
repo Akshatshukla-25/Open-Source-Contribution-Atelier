@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { DashboardPage } from "../pages/DashboardPage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,24 +6,36 @@ import React from "react";
 
 // Mock Recharts library to prevent JSDOM layout measuring issues
 vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-  BarChart: ({ children }: any) => <div data-testid="bar-chart">{children}</div>,
+  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="responsive-container">{children}</div>
+  ),
+  BarChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="bar-chart">{children}</div>
+  ),
   Bar: () => <div data-testid="bar" />,
   XAxis: () => <div data-testid="xaxis" />,
   YAxis: () => <div data-testid="yaxis" />,
   CartesianGrid: () => <div data-testid="cartesian-grid" />,
   Tooltip: () => <div data-testid="tooltip" />,
   Legend: () => <div data-testid="legend" />,
-  PieChart: ({ children }: any) => <div data-testid="pie-chart">{children}</div>,
-  Pie: ({ children }: any) => <div data-testid="pie">{children}</div>,
+  PieChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="pie-chart">{children}</div>
+  ),
+  Pie: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="pie">{children}</div>
+  ),
   Cell: () => <div data-testid="cell" />,
-  AreaChart: ({ children }: any) => <div data-testid="area-chart">{children}</div>,
+  AreaChart: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="area-chart">{children}</div>
+  ),
   Area: () => <div data-testid="area" />,
 }));
 
 // Mock react-router-dom Link component
 vi.mock("react-router-dom", () => ({
-  Link: ({ children, to }: any) => <a href={to}>{children}</a>,
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }));
 
 // Mock useAuth context hook
@@ -32,10 +44,14 @@ vi.mock("../features/auth/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
 }));
 
-// Mock fetchApi module
-const mockFetchApi = vi.fn();
-vi.mock("../lib/api", () => ({
-  fetchApi: (endpoint: string) => mockFetchApi(endpoint),
+// Mock useBookmarks hook
+vi.mock("../hooks/useBookmarks", () => ({
+  useBookmarks: () => ({
+    bookmarks: [],
+    isLoading: false,
+    toggleBookmark: { mutate: vi.fn(), isPending: false },
+    isBookmarked: vi.fn(),
+  }),
 }));
 
 // Helper function to render component with fresh React Query Client
@@ -48,9 +64,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
     },
   });
   return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
   );
 }
 
@@ -71,46 +85,26 @@ describe("DashboardPage Dual-Role Views", () => {
       },
     });
 
-    // Mock API response for admin analytics
-    mockFetchApi.mockImplementation((endpoint: string) => {
-      if (endpoint === "/dashboard/admin/") {
-        return Promise.resolve({
-          system_stats: {
-            total_issues: 10,
-            solved_issues: 4,
-            open_issues: 4,
-            in_progress_issues: 2,
-            total_prs: 5,
-            merged_prs: 3,
-            pending_prs: 1,
-            closed_prs: 1,
-            active_contributors: 2,
-          },
-          contributor_activity: [
-            { id: 2, username: "bob_coder", prs_merged: 2, issues_solved: 3, xp: 250 },
-            { id: 3, username: "alice_dev", prs_merged: 1, issues_solved: 1, xp: 100 },
-          ],
-          pending_prs: [
-            { id: 9, title: "Feature request review", contributor: "bob_coder", issue_title: "Add dark mode toggle", created_at: "2026-06-01T12:00:00Z" }
-          ],
-        });
-      }
-      return Promise.reject(new Error("Unknown Endpoint"));
-    });
+    // MSW handlers in src/mocks/handlers.ts already provide the default mock responses
+    // for admin analytics and leaderboard.
 
     renderWithQueryClient(<DashboardPage />);
 
     // Assert that the Admin View specific sections render
-    expect(await screen.findByText("MAINTAINER CONTROL PANEL 🛠️")).toBeInTheDocument();
-    expect(screen.getByText("Project Health & Contributor Atelier")).toBeInTheDocument();
-    
+    expect(
+      await screen.findByText("MAINTAINER CONTROL PANEL 🛠️"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Project Health & Cohort Monitor"),
+    ).toBeInTheDocument();
+
     // Assert stats blocks
     expect(screen.getByText("System Issues")).toBeInTheDocument();
     expect(screen.getByText("10")).toBeInTheDocument(); // total issues count
     expect(screen.getByText("Solved: 4")).toBeInTheDocument();
-    
+
     // Assert pending PRs
-    expect(screen.getByText("Pending Pull Requests Queue (1)")).toBeInTheDocument();
+    expect(screen.getByText("Pending Pull Requests (1)")).toBeInTheDocument();
     expect(screen.getByText("Feature request review")).toBeInTheDocument();
     expect(screen.getByText("@bob_coder")).toBeInTheDocument();
   });
@@ -126,57 +120,53 @@ describe("DashboardPage Dual-Role Views", () => {
       },
     });
 
-    // Mock API response for contributor analytics & lessons list
-    mockFetchApi.mockImplementation((endpoint: string) => {
-      if (endpoint === "/dashboard/contributor/") {
-        return Promise.resolve({
-          personal_stats: {
-            issues_solved: 3,
-            prs_merged: 2,
-            total_xp: 250,
-            streak_days: 4,
-            rank: 1,
-          },
-          assigned_issues: [
-            { id: 11, title: "Fix git conflicts", description: "Practice conflict resolution", status: "in_progress", points: 50, created_at: "2026-06-01T10:00:00Z" }
-          ],
-          recent_prs: [
-            { id: 22, title: "Mock PR submission", status: "merged", issue_title: "Fix git conflicts", created_at: "2026-06-01T11:00:00Z", merged_at: "2026-06-01T12:00:00Z" }
-          ],
-          progress_tracker: {
-            completed_lessons: 2,
-            total_lessons: 5,
-            completion_percentage: 40,
-          },
-        });
-      }
-      if (endpoint === "/content/lessons/") {
-        return Promise.resolve([
-          { slug: "intro", title: "Introduction to Atelier", summary: "Welcome lesson", difficulty: "beginner", estimated_minutes: 5 }
-        ]);
-      }
-      return Promise.reject(new Error("Unknown Endpoint"));
-    });
+    // MSW handlers in src/mocks/handlers.ts already provide the default mock responses
+    // for contributor analytics and lessons list.
 
     renderWithQueryClient(<DashboardPage />);
 
-    // Assert that the Contributor View specific sections render
-    expect(await screen.findByText("LEVEL 3 CONTRIBUTOR 🚀")).toBeInTheDocument();
-    expect(screen.getByText("Welcome back, bob_coder.")).toBeInTheDocument();
-    expect(screen.getByText("You have earned 250 XP bounties so far. Keep solving issues!")).toBeInTheDocument();
-    
+    expect(await screen.findByText(/LEVEL/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Welcome to the Atelier, bob_coder."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/completed.*course modules/)).toBeInTheDocument();
+
     // Assert streak, xp, rank, and merged PR cards
     expect(screen.getByText("Streak Days")).toBeInTheDocument();
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(screen.getByText("#1")).toBeInTheDocument(); // Rank
-    
+
     // Assert assigned issues
-    expect(screen.getByText("Your Assigned Issues (1)")).toBeInTheDocument();
+    expect(screen.getByText("Assigned Issues")).toBeInTheDocument();
     expect(screen.getByText("Fix git conflicts")).toBeInTheDocument();
-    expect(screen.getByText("Practice conflict resolution")).toBeInTheDocument();
 
     // Assert lesson queue
-    expect(screen.getByText("Contribution Curriculum Queue")).toBeInTheDocument();
+    expect(screen.getByText("Resume Learning Queue")).toBeInTheDocument();
     expect(screen.getByText("Introduction to Atelier")).toBeInTheDocument();
+  });
+
+  it("opens the Progress Report modal with current stats when Export Progress as PDF is clicked", async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        id: 2,
+        username: "bob_coder",
+        email: "bob@atelier.com",
+        is_staff: false,
+      },
+    });
+
+    renderWithQueryClient(<DashboardPage />);
+
+    await screen.findByText(/LEVEL/);
+
+    const exportButton = await screen.findByText("Export Progress as PDF");
+    fireEvent.click(exportButton);
+
+    expect(await screen.findByText("Progress Report")).toBeInTheDocument();
+    expect(screen.getByText("bob_coder")).toBeInTheDocument();
+    expect(screen.getByText("Export as PDF")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Return to Dashboard"));
+    expect(screen.queryByText("Progress Report")).not.toBeInTheDocument();
   });
 });

@@ -1,66 +1,55 @@
-# Contributing
+# Contributing to Open Source Contribution Atelier
 
-Thanks for contributing to Open Source Contribution Atelier.
+Thank you for your interest in contributing! We welcome all contributions, from documentation fixes to major feature enhancements. To make the contribution process smooth and successful, please follow these guidelines.
 
-## Principles
+---
 
-- Keep contributions beginner-friendly and well-documented
-- Prefer safe defaults and avoid introducing secrets into code
-- Add tests for backend and frontend changes when practical
-- Discuss large architectural changes before implementation
+## 🛠️ Local Development Setup
 
-## Setup
+To get started quickly, we provide a `Makefile` that wraps the core commands. 
 
-Use the instructions in [README.md](README.md) to run the project locally.
+1. **Install Dependencies**:
+   ```bash
+   make install
+   ```
+2. **Start the Development Servers (via Docker)**:
+   This boots Postgres, Redis, the Django backend, and the Vite frontend:
+   ```bash
+   make start
+   ```
+3. **Run Linting & Formatting**:
+   Ensure your changes are formatted properly before committing. Pre-commit hooks are configured, but you can also run:
+   ```bash
+   make format
+   ```
+4. **Run Unit Tests**:
+   ```bash
+   make test
+   ```
+5. **Run Full Verification Checklist**:
+   ```bash
+   make verify  # (or ./verify.sh)
+   ```
 
-## Branching
+---
 
-- Never commit directly to `main`
-- Start every change by creating a new branch from `main`
-- Use branch names such as `feature/terminal-feedback`, `fix/auth-tests`, or `docs/setup-guide`
-- Use clear commit messages
-- Open focused pull requests
+## 📋 Pull Request Requirements
 
-Recommended commands:
+We maintain strict quality controls on pull requests to ensure our tests remain green and contributions align with the project goals.
 
-```bash
-git pull origin main
-git switch -c feature/short-description
-```
+### 1. Linking an Issue
+All pull requests must resolve a corresponding open issue. Please reference the issue in your PR description using one of the closing keywords (e.g. `Closes #123` or `Fixes #123`).
 
-## Pull Requests
+### 2. Matching Scope Verification
+To prevent partial implementations, the files modified in your pull request must correspond to the scope promised in the linked issue:
+- If the issue description mentions **backend** tasks, the PR must modify files in the `backend/` directory.
+- If the issue description mentions **frontend** or **ui** tasks, the PR must modify files in the `frontend/` directory.
+- If the issue description mentions **database** or **migrations**, the PR must include backend database models or migrations.
 
-- Describe the problem and the chosen approach
-- Include screenshots for UI changes
-- Mention any schema or environment updates
-- Confirm tests run locally
-- Push your branch and open the PR from that branch into `main`
+**Partial Scope Exemption**: If you are only implementing a specific part of a multi-part issue (e.g., you only know frontend and want to implement the UI layout first), you can easily override the scope verification check by explicitly writing one of the following phrases in your pull request description:
+* `Frontend only` / `only frontend`
+* `Backend only` / `only backend`
+* `Database only`
 
-## Code Style
-
-- Python: Black-compatible formatting, modular Django apps
-- TypeScript: ESLint + Prettier, accessible React components
-- Avoid large unrelated refactors in feature PRs
-
-## Security
-
-- Never commit `.env` files or tokens
-- Do not add code that executes untrusted shell input
-- Route exercise validation through the sandbox verifier service
-- Do not commit generated artifacts such as `node_modules/`, `dist/`, or local virtual environments
-
-## Lesson Contributions & Issues
-
-- To propose a new lesson or exercise, open an issue titled `lesson: <short title>` and include:
-	- a short summary, learning objectives, and the expected exercise command(s)
-	- suggested order/placement in the track
-	- any files or assets required
-- If you want to work on the lesson yourself, comment on the issue and open a branch prefixed with `lesson/`.
-- Use `python manage.py seed_lessons` to load the example lessons locally; maintainers will review and promote community-submitted lessons.
-
-## Issue Hygiene For Maintainers
-
-- Keep issue labels consistent: `bug`, `enhancement`, `curriculum`, `good first issue`, `needs-triage`, `blocked`.
-- Close duplicate/outdated issues with a short reason and a pointer to the active issue.
-- Convert vague issues into actionable tasks by adding scope and acceptance criteria.
-- If an issue is stale for >30 days with no owner, either re-scope or close it with a reopen note.
+### 3. SSoC26 Contributors
+If you are participating in SSoC26, please check the contributor checkmark `- [x] I am a SSoC26 contributor` in the issue/PR templates. The automation will sync the `SSoC26` label to both your PR and linked issue, and automatically assign them to you.

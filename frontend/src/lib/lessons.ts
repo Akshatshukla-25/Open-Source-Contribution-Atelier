@@ -9,7 +9,41 @@ export interface Exercise {
   points?: number;
 }
 
+export interface ConflictScenario {
+  baseBranchName: string;
+  featureBranchName: string;
+  fileContent: string; // The file content containing Git conflict markers (example marker)
+}
+
+export interface PythonExercise {
+  prompt: string;
+  starterCode: string;
+  testCode: string; // Hidden code appended after user code to run assertions
+  hint?: string;
+}
+
+export interface JSExercise {
+  prompt: string;
+  starterCode: string;
+  testCode: string;
+  hint?: string;
+}
+
+export interface DebugExercise {
+  prompt: string;
+  starterCode: string;
+  hint?: string;
+}
+
+export interface RustExercise {
+  prompt?: string;
+  starterCode: string;
+  expected?: string;
+  hint?: string;
+}
+
 export interface Lesson {
+  id: number;
   slug: string; // used for URL
   title: string;
   description: string; // summary
@@ -17,16 +51,31 @@ export interface Lesson {
   expected: string | RegExp; // validation pattern or exact string
   hint: string;
   difficulty?: string;
+  points?: number;
   estimatedMinutes?: number;
   learningObjectives?: string[];
   tips?: string[]; // optional tips/mistakes guidance
   exercises?: Exercise[];
   order?: number;
+  filePath?: string;
+  quizzes?: Array<{
+    question: string;
+    options: string[];
+    answer: number;
+    explanation: string;
+    timeLimitSeconds?: number;
+  }>;
+  conflictScenario?: ConflictScenario;
+  pythonExercise?: PythonExercise;
+  jsExercise?: JSExercise;
+  debugExercise?: DebugExercise;
+  category?: string;
 }
 
 // Small built-in fallback lessons (used if API unreachable)
 export const lessons: Lesson[] = [
   {
+    id: 1,
     slug: "intro",
     title: "Open Source Mindset",
     description: "Understand how open source collaboration actually works.",
@@ -48,49 +97,111 @@ export const lessons: Lesson[] = [
   },
 ];
 
-// Fetch lessons from backend API and map fields to frontend shape.
-export async function fetchLessonsApi(): Promise<Lesson[]> {
+export type LessonsFetchResult = {
+  lessons: Lesson[];
+  /** True when lessons came from a non-empty `/content/lessons/` response */
+  fromApi: boolean;
+};
+
+function mapApiLessons(data: unknown[]): Lesson[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[]).map((les, index: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstExercise = (les.exercises as any[] | undefined)?.[0];
+    return {
+      id: Number(les.id ?? 0),
+      slug: String(les.slug ?? ""),
+      title: String(les.title ?? ""),
+      description: String(les.description ?? les.summary ?? ""),
+      explanation: String(les.content ?? ""),
+      expected: String(firstExercise?.expectedCommand ?? ""),
+      hint: String(
+        firstExercise?.explanation ??
+          "Read the lesson contents and solve the check.",
+      ),
+      difficulty: String(les.difficulty ?? "beginner"),
+      points: Number(firstExercise?.points ?? 15),
+      estimatedMinutes: Number(les.estimatedMinutes ?? 10),
+      learningObjectives: Array.isArray(les.learningObjectives)
+        ? les.learningObjectives
+        : [],
+      tips: Array.isArray(les.tips) ? les.tips : [],
+      exercises: Array.isArray(les.exercises) ? les.exercises : [],
+      quizzes: Array.isArray(les.quizzes) ? les.quizzes : [],
+      conflictScenario: les.conflictScenario ?? undefined,
+      pythonExercise: les.pythonExercise ?? undefined,
+      jsExercise: les.jsExercise ?? undefined,
+      debugExercise: les.debugExercise ?? undefined,
+      order: Number(les.order ?? index),
+      category: String(les.category ?? "general"),
+      filePath: les.filePath ? String(les.filePath) : undefined,
+    } satisfies Lesson;
+  });
+}
+
+/** Fetch lessons and report whether the live API catalog was used. */
+export async function fetchLessonsApiResult(): Promise<LessonsFetchResult> {
   try {
-    const data = await fetchApi("/content/lessons/");
-
-    if (!Array.isArray(data)) return lessons;
-
-    const mapped: Lesson[] = data.map((l: any) => {
-      const firstExercise: Exercise | undefined = (l.exercises && l.exercises[0]) || undefined;
-      let expected: string | RegExp = ".+";
-
-      if (firstExercise) {
-        if (firstExercise.expected_command && firstExercise.expected_command.trim().length > 0) {
-          // use exact match for expected_command when available
-          expected = firstExercise.expected_command;
-        } else {
-          // fallback for reflection-style lessons
-          expected = /.+/;
-        }
-      }
-
-      return {
-        slug: l.slug,
-        title: l.title,
-        description: l.summary || l.description || "",
-        explanation: l.content || l.explanation || "",
-        expected,
-        hint: firstExercise?.prompt || "Read the lesson and run the expected command.",
-        difficulty: l.difficulty || "beginner",
-        estimatedMinutes: l.estimated_minutes || 10,
-        learningObjectives: Array.isArray(l.learning_objectives) ? l.learning_objectives : [],
-        tips: Array.isArray(l.tips) ? l.tips : [],
-        exercises: l.exercises || [],
-        order: l.order ?? 0,
-      };
+    const data = await fetchApi("/content/lessons/", {
+      requireAuth: false,
+      timeoutMs: 3000,
     });
-
-    // sort by order
-    mapped.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-    return mapped;
+    if (!Array.isArray(data) || data.length === 0) {
+      console.warn(
+        "[fetchLessonsApi] API returned no lessons. Using built-in fallbacks.",
+      );
+      return { lessons, fromApi: false };
+    }
+    return { lessons: mapApiLessons(data), fromApi: true };
   } catch (err) {
-    // fall back to built-in lessons
-    return lessons;
+    console.error(
+      "[fetchLessonsApi] API request failed, using built-in fallback lessons:",
+      err,
+    );
+    return { lessons, fromApi: false };
+  }
+}
+
+// Fetch lessons from live API
+export async function fetchLessonsApi(): Promise<Lesson[]> {
+  const { lessons: result } = await fetchLessonsApiResult();
+  return result;
+}
+
+export function buildModulesFromLessons(lessonsList: Lesson[]) {
+  type ModuleEntry = {
+    id: string;
+    title: string;
+    lessons: { slug: string; title: string; difficulty?: string }[];
+  };
+  const modulesMap = new Map<string, ModuleEntry>();
+  lessonsList.forEach((les) => {
+    const cat = les.category || "general";
+    if (!modulesMap.has(cat)) {
+      modulesMap.set(cat, {
+        id: cat,
+        title: cat.charAt(0).toUpperCase() + cat.slice(1).replace(/-/g, " "),
+        lessons: [],
+      });
+    }
+
+    modulesMap.get(cat)!.lessons.push({
+      slug: les.slug,
+      title: les.title,
+      difficulty: les.difficulty,
+    });
+  });
+  return Array.from(modulesMap.values());
+}
+
+// Fetch markdown text content for a lesson
+export async function fetchLessonContent(filePath: string): Promise<string> {
+  try {
+    const response = await fetch(`/content/${filePath}`);
+    if (!response.ok) throw new Error(`Markdown file not found: ${filePath}`);
+    return await response.text();
+  } catch (err) {
+    console.error("Error loading lesson markdown content:", err);
+    return "# Content not found\nCould not retrieve the detailed documentation for this lesson.";
   }
 }

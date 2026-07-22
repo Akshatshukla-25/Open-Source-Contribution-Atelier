@@ -1,11 +1,28 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { fetchApi } from "../../lib/api";
+// @refresh reset
+/* eslint-disable react-refresh/only-export-components */
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useCallback,
+} from "react";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { checkUser, loginTokens, logoutAction } from "./authSlice";
 
 type User = {
   id: number;
   username: string;
   email: string;
   is_staff: boolean;
+  avatar_url?: string | null;
+  cover_image_url?: string | null;
+  bio?: string;
+  bio_html?: string;
+  timezone?: string;
+  twitter_url?: string;
+  linkedin_url?: string;
+  github_url?: string;
+  receive_weekly_digest?: boolean;
 };
 
 type AuthContextType = {
@@ -20,42 +37,42 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const dispatch = useAppDispatch();
+  const { user, isAuthenticated, isLoading } = useAppSelector(
+    (state) => state.auth,
+  );
 
   const login = (tokens: { access: string; refresh: string }) => {
-    localStorage.setItem("accessToken", tokens.access);
-    localStorage.setItem("refreshToken", tokens.refresh);
-    checkUser();
+    dispatch(loginTokens(tokens));
+    dispatch(checkUser());
   };
 
-  const logout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    setUser(null);
-  };
-
-  const checkUser = async () => {
+  const logout = async () => {
     try {
-      if (!localStorage.getItem("accessToken")) {
-        setUser(null);
-      } else {
-        const data = await fetchApi("/auth/me/");
-        setUser(data);
-      }
-    } catch (e) {
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
+      sessionStorage.setItem("userLoggedOut", "true");
+    } catch (e) {}
+    dispatch(logoutAction());
   };
+
+  const performCheckUser = useCallback(async () => {
+    dispatch(checkUser());
+  }, [dispatch]);
 
   useEffect(() => {
-    checkUser();
-  }, []);
+    performCheckUser();
+  }, [performCheckUser]);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, checkUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isAuthenticated,
+        isLoading,
+        login,
+        logout,
+        checkUser: performCheckUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
