@@ -133,7 +133,9 @@ INSTALLED_APPS += [
     "apps.notifications.apps.NotificationsConfig",
     "drf_spectacular",
     "apps.dashboard.apps.DashboardConfig",
+    "apps.predictions.apps.PredictionsConfig",
 ]
+
 
 
 CHANNEL_LAYERS = {

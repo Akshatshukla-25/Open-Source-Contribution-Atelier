@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchApi } from "../lib/api";
 import { Link } from "react-router-dom";
 import SkeletonCard from "../components/ui/skeletons/SkeletonCard";
+import { PRReviewPredictionWidget } from "../components/PRReviewPredictionWidget";
+
 import {
   BarChart,
   Bar,
@@ -148,7 +150,13 @@ export function DashboardPage() {
           </div>
         </section>
 
+        {/* PR Review Delay Prediction Widget */}
+        <section>
+          <PRReviewPredictionWidget />
+        </section>
+
         {/* Charts & Analytics */}
+
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           {/* Contributor Activity Bar Chart */}
           <div className="rounded-3xl border-4 border-black bg-white p-6 shadow-card dark:bg-[#1f1c18] dark:border-[#2e2924] dark:shadow-none">
