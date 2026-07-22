@@ -1,14 +1,16 @@
 import logging
+from celery import shared_task
 from .models import PullRequestMetric, ReviewDelayPrediction, DelayAlert, ReviewerAvailability
 from .ml_engine import predictor
 
 logger = logging.getLogger(__name__)
 
 
+@shared_task
 def monitor_pr_review_delays():
     """
-    Celery task / periodic monitoring function to evaluate open PRs, predict review delays,
-    and create automated alerts for high/critical stagnation risk PRs.
+    Celery periodic task to evaluate open PRs, predict review delays,
+    and create automated alerts for high/critical stagnation risk PRs (deduplicated).
     """
     open_prs = PullRequestMetric.objects.filter(status="OPEN")
     alerts_created = 0
@@ -38,20 +40,26 @@ def monitor_pr_review_delays():
         )
         predictions_processed += 1
 
-        # Trigger automated delay alert for HIGH or CRITICAL risk
+        # Trigger automated delay alert for HIGH or CRITICAL risk (with deduplication)
         if res["risk_level"] in ["HIGH", "CRITICAL"]:
-            message = (
-                f"⚠️ High Stagnation Risk Alert: PR #{pr.pr_number} ('{pr.title}') has a predicted "
-                f"review delay of {res['predicted_delay_hours']}h (±12h). Assigned reviewer: "
-                f"{reviewer.reviewer_username if reviewer else 'Unassigned'}."
-            )
-            DelayAlert.objects.create(
-                prediction=prediction,
-                alert_type="HIGH_STAGNATION_RISK" if res["risk_level"] == "HIGH" else "CRITICAL_STAGNATION_RISK",
-                message=message,
-                is_sent=True,
-            )
-            alerts_created += 1
+            existing_alert = DelayAlert.objects.filter(
+                prediction__pr=pr,
+                prediction__risk_level__in=["HIGH", "CRITICAL"],
+            ).exists()
+
+            if not existing_alert:
+                message = (
+                    f"⚠️ High Stagnation Risk Alert: PR #{pr.pr_number} ('{pr.title}') has a predicted "
+                    f"review delay of {res['predicted_delay_hours']}h (±12h). Assigned reviewer: "
+                    f"{reviewer.reviewer_username if reviewer else 'Unassigned'}."
+                )
+                DelayAlert.objects.create(
+                    prediction=prediction,
+                    alert_type="HIGH_STAGNATION_RISK" if res["risk_level"] == "HIGH" else "CRITICAL_STAGNATION_RISK",
+                    message=message,
+                    is_sent=True,
+                )
+                alerts_created += 1
 
     return {
         "predictions_processed": predictions_processed,
@@ -59,6 +67,7 @@ def monitor_pr_review_delays():
     }
 
 
+@shared_task
 def update_reviewer_availability():
     """
     Updates active workload counters for reviewers.

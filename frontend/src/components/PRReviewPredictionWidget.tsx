@@ -16,19 +16,15 @@ export const PRReviewPredictionWidget: React.FC = () => {
   const [changedFiles, setChangedFiles] = useState<number>(6);
   const [currentWorkload, setCurrentWorkload] = useState<number>(3);
   const [reviewerName, setReviewerName] = useState<string>('alex_maintainer');
-  const [prediction, setPrediction] = useState<PredictionResult | null>({
-    predicted_delay_hours: 34.5,
-    confidence_interval_hours: 12.0,
-    min_predicted_delay_hours: 22.5,
-    max_predicted_delay_hours: 46.5,
-    risk_level: 'MEDIUM',
-    recommendation: 'Review workload optimal. Predicted turnaround within SLA.',
-  });
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handlePredict = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
+
     try {
       const res = await fetch('/api/predictions/predict/', {
         method: 'POST',
@@ -47,35 +43,13 @@ export const PRReviewPredictionWidget: React.FC = () => {
         const data = await res.json();
         setPrediction(data);
       } else {
-        // Fallback calculations for preview simulation
-        const lines = additions + deletions;
-        const delay = Math.round(12 + lines * 0.04 + changedFiles * 1.2 + currentWorkload * 7);
-        let risk: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW';
-        if (delay > 72) risk = 'CRITICAL';
-        else if (delay > 48) risk = 'HIGH';
-        else if (delay > 24) risk = 'MEDIUM';
-
-        setPrediction({
-          predicted_delay_hours: delay,
-          confidence_interval_hours: 12.0,
-          min_predicted_delay_hours: Math.max(0, delay - 12),
-          max_predicted_delay_hours: delay + 12,
-          risk_level: risk,
-          recommendation: risk === 'HIGH' || risk === 'CRITICAL'
-            ? 'High stagnation risk! Recommend re-assigning to available reviewer.'
-            : 'Review workload optimal.',
-        });
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || `Prediction API returned status ${res.status}. Could not compute prediction.`);
+        setPrediction(null);
       }
-    } catch {
-      // Local fallback
-      setPrediction({
-        predicted_delay_hours: 28.0,
-        confidence_interval_hours: 12.0,
-        min_predicted_delay_hours: 16.0,
-        max_predicted_delay_hours: 40.0,
-        risk_level: 'MEDIUM',
-        recommendation: 'Review workload optimal.',
-      });
+    } catch (err: any) {
+      setError('Network error: Unable to connect to PR Delay Prediction service.');
+      setPrediction(null);
     } finally {
       setLoading(false);
     }
@@ -187,57 +161,74 @@ export const PRReviewPredictionWidget: React.FC = () => {
           </button>
         </form>
 
-        {/* Prediction Results */}
-        {prediction && (
-          <div className="flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-5">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                  Predicted Review Delay
-                </span>
-                <span
-                  className={`rounded-md border px-2.5 py-0.5 text-xs font-bold ${getRiskBadgeColor(
-                    prediction.risk_level
-                  )}`}
-                >
-                  {prediction.risk_level} RISK
-                </span>
-              </div>
+        {/* Prediction Results or Error or Initial Prompt */}
+        <div className="flex flex-col justify-between rounded-xl border border-slate-800 bg-slate-950/60 p-5">
+          {error && (
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
+              <span className="font-bold">Error: </span> {error}
+            </div>
+          )}
 
-              <div className="mt-3 flex items-baseline gap-2">
-                <span className="text-4xl font-extrabold text-white">
-                  {prediction.predicted_delay_hours}h
-                </span>
-                <span className="text-sm font-medium text-slate-400">
-                  (±{prediction.confidence_interval_hours}h confidence margin)
-                </span>
-              </div>
-
-              <p className="mt-1 text-xs text-slate-400">
-                Range: {prediction.min_predicted_delay_hours}h – {prediction.max_predicted_delay_hours}h
+          {!prediction && !error && (
+            <div className="flex h-full flex-col items-center justify-center text-center p-6">
+              <span className="text-4xl mb-3">📊</span>
+              <h3 className="text-sm font-bold text-slate-200">No Active Prediction</h3>
+              <p className="mt-1 text-xs text-slate-400 max-w-xs">
+                Submit PR details to calculate predicted review turnaround time and stagnation risk.
               </p>
-
-              <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/90 p-3 text-xs text-slate-300">
-                <span className="font-semibold text-indigo-400">Actionable Insight: </span>
-                {prediction.recommendation}
-              </div>
             </div>
+          )}
 
-            <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-4 text-center">
-              <div className="rounded-lg bg-slate-900/60 p-2">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider">Complexity Score</span>
-                <p className="text-sm font-bold text-slate-200">
-                  {additions + deletions > 500 ? 'High' : 'Moderate'} ({additions + deletions} lines)
+          {prediction && (
+            <>
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                    Predicted Review Delay
+                  </span>
+                  <span
+                    className={`rounded-md border px-2.5 py-0.5 text-xs font-bold ${getRiskBadgeColor(
+                      prediction.risk_level
+                    )}`}
+                  >
+                    {prediction.risk_level} RISK
+                  </span>
+                </div>
 
+                <div className="mt-3 flex items-baseline gap-2">
+                  <span className="text-4xl font-extrabold text-white">
+                    {prediction.predicted_delay_hours}h
+                  </span>
+                  <span className="text-sm font-medium text-slate-400">
+                    (±{prediction.confidence_interval_hours}h confidence margin)
+                  </span>
+                </div>
+
+                <p className="mt-1 text-xs text-slate-400">
+                  Range: {prediction.min_predicted_delay_hours}h – {prediction.max_predicted_delay_hours}h
                 </p>
+
+                <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/90 p-3 text-xs text-slate-300">
+                  <span className="font-semibold text-indigo-400">Actionable Insight: </span>
+                  {prediction.recommendation}
+                </div>
               </div>
-              <div className="rounded-lg bg-slate-900/60 p-2">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider">Workload Level</span>
-                <p className="text-sm font-bold text-slate-200">{currentWorkload} PRs assigned</p>
+
+              <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-2 gap-4 text-center">
+                <div className="rounded-lg bg-slate-900/60 p-2">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">Complexity Score</span>
+                  <p className="text-sm font-bold text-slate-200">
+                    {additions + deletions > 500 ? 'High' : 'Moderate'} ({additions + deletions} lines)
+                  </p>
+                </div>
+                <div className="rounded-lg bg-slate-900/60 p-2">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider">Workload Level</span>
+                  <p className="text-sm font-bold text-slate-200">{currentWorkload} PRs assigned</p>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
