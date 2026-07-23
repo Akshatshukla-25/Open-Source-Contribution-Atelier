@@ -17,6 +17,10 @@ class ReviewerAvailability(models.Model):
     def __str__(self):
         return f"{self.reviewer_username} (Workload: {self.current_workload})"
 
+    def recalculate_workload(self):
+        self.current_workload = self.assigned_prs.filter(status="OPEN").count()
+        self.save(update_fields=["current_workload"])
+
 
 class PullRequestMetric(models.Model):
     STATUS_CHOICES = [
@@ -25,7 +29,8 @@ class PullRequestMetric(models.Model):
         ("CLOSED", "Closed"),
     ]
 
-    pr_number = models.IntegerField(unique=True)
+    repo_name = models.CharField(max_length=150, default="default")
+    pr_number = models.IntegerField()
     title = models.CharField(max_length=255)
     author = models.CharField(max_length=150)
     assigned_reviewer = models.ForeignKey(
@@ -45,9 +50,10 @@ class PullRequestMetric(models.Model):
 
     class Meta:
         ordering = ["-pr_number"]
+        unique_together = [("repo_name", "pr_number")]
 
     def __str__(self):
-        return f"PR #{self.pr_number}: {self.title}"
+        return f"{self.repo_name}#PR {self.pr_number}: {self.title}"
 
     @property
     def total_lines_changed(self):
@@ -60,6 +66,8 @@ class PullRequestMetric(models.Model):
             self.actual_review_delay_hours = round(max(0.1, delta_seconds / 3600.0), 1)
         self.status = status_val
         self.save()
+        if self.assigned_reviewer:
+            self.assigned_reviewer.recalculate_workload()
 
 
 class ReviewDelayPrediction(models.Model):

@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 from celery import shared_task
 from .models import PullRequestMetric, ReviewDelayPrediction, DelayAlert, ReviewerAvailability
 from .ml_engine import predictor
@@ -75,8 +76,28 @@ def update_reviewer_availability():
     reviewers = ReviewerAvailability.objects.all()
     updated_count = 0
     for reviewer in reviewers:
-        active_count = reviewer.assigned_prs.filter(status="OPEN").count()
-        reviewer.current_workload = active_count
-        reviewer.save()
+        reviewer.recalculate_workload()
         updated_count += 1
     return {"reviewers_updated": updated_count}
+
+
+@shared_task
+def retrain_predictions_model():
+    """
+    Background task to re-train PR review delay predictor on historical PR metrics with ground truth outcomes.
+    """
+    prs = PullRequestMetric.objects.filter(actual_review_delay_hours__isnull=False)
+    if not prs.exists():
+        return {"samples_trained": 0, "message": "No ground truth dataset found"}
+
+    X_train = []
+    y_train = []
+    for pr in prs:
+        workload = pr.assigned_reviewer.current_workload if pr.assigned_reviewer else 1
+        activity = pr.assigned_reviewer.activity_score if pr.assigned_reviewer else 0.8
+        avg_resp = pr.assigned_reviewer.avg_response_time_hours if pr.assigned_reviewer else 24.0
+        X_train.append([pr.total_lines_changed, pr.changed_files, workload, activity, avg_resp])
+        y_train.append(pr.actual_review_delay_hours)
+
+    predictor.fit_model(np.array(X_train), np.array(y_train))
+    return {"samples_trained": len(X_train), "status": "success"}

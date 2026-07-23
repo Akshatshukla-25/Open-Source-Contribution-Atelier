@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.db.models import Avg, Count
 from .models import ReviewerAvailability, PullRequestMetric, ReviewDelayPrediction, DelayAlert
 from .ml_engine import predictor
-from .tasks import monitor_pr_review_delays, update_reviewer_availability
+from .tasks import monitor_pr_review_delays, update_reviewer_availability, retrain_predictions_model
 from .github_service import GitHubPRService
 
 
@@ -55,8 +55,10 @@ class PredictDelayAPIView(views.APIView):
         if pr_number:
             try:
                 pr_num = int(pr_number)
+                repo_name = data.get("repo_name", "default")
                 service = GitHubPRService()
                 pr_data = {
+                    "repo_name": repo_name,
                     "pr_number": pr_num,
                     "title": data.get("title", f"PR #{pr_num}"),
                     "author": data.get("author", "contributor"),
@@ -177,60 +179,56 @@ class TriggerMonitoringAPIView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        queued = False
         try:
             from django_q.tasks import async_task
             async_task("apps.predictions.tasks.monitor_pr_review_delays")
             async_task("apps.predictions.tasks.update_reviewer_availability")
+            queued = True
             msg = "Monitoring tasks dispatched asynchronously via Django-Q."
-            details = {}
         except Exception:
             try:
                 monitor_pr_review_delays.delay()
                 update_reviewer_availability.delay()
+                queued = True
                 msg = "Monitoring tasks dispatched asynchronously via Celery."
-                details = {}
             except Exception:
-                details = monitor_pr_review_delays()
-                update_reviewer_availability()
-                msg = "Monitoring task executed synchronously."
+                msg = "Async worker service unavailable. Monitoring task could not be queued."
 
-        return Response({
-            "status": msg,
-            "details": details,
-        }, status=status.HTTP_200_OK)
+        if not queued:
+            return Response({"status": msg, "error": "Async worker unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
+        return Response({"status": msg}, status=status.HTTP_202_ACCEPTED)
 
 
 class TrainModelAPIView(views.APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         """
-        Triggers online re-training of PR review delay predictor on historical PR metrics.
+        Triggers background re-training of PR review delay predictor on historical PR metrics.
         """
-        prs = PullRequestMetric.objects.filter(actual_review_delay_hours__isnull=False)
-        if not prs.exists():
-            return Response({
-                "message": "No historical PR metrics with ground truth actual_review_delay_hours found for training.",
-                "samples_trained": 0,
-            }, status=status.HTTP_200_OK)
+        queued = False
+        try:
+            from django_q.tasks import async_task
+            async_task("apps.predictions.tasks.retrain_predictions_model")
+            queued = True
+            msg = "Model retraining task queued asynchronously via Django-Q."
+        except Exception:
+            try:
+                retrain_predictions_model.delay()
+                queued = True
+                msg = "Model retraining task queued asynchronously via Celery."
+            except Exception:
+                # Fallback to background thread or execute safely
+                retrain_predictions_model()
+                msg = "Model retraining completed."
+                queued = True
 
-        X_train = []
-        y_train = []
-        for pr in prs:
-            workload = pr.assigned_reviewer.current_workload if pr.assigned_reviewer else 1
-            activity = pr.assigned_reviewer.activity_score if pr.assigned_reviewer else 0.8
-            avg_resp = pr.assigned_reviewer.avg_response_time_hours if pr.assigned_reviewer else 24.0
-            total_lines = pr.additions + pr.deletions
-
-            X_train.append([total_lines, pr.changed_files, workload, activity, avg_resp])
-            y_train.append(pr.actual_review_delay_hours)
-
-        predictor.fit_model(np.array(X_train), np.array(y_train))
         return Response({
-            "message": "Successfully re-trained PR review delay model on historical data.",
-            "samples_trained": len(X_train),
-        }, status=status.HTTP_200_OK)
+            "message": msg,
+            "queued": queued,
+        }, status=status.HTTP_202_ACCEPTED)
 
 
 class PredictionAnalyticsAPIView(views.APIView):
